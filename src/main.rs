@@ -2,25 +2,25 @@ mod aws;
 mod parser;
 mod models;
 mod csvchunker;
+mod config;
 
 use anyhow::Result;
 use aws_sdk_s3::Client;
 use quick_xml::Reader;
 use std::io::Cursor;
-// use chrono::Local;
+use chrono::Local;
 use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
 
     let start_time = Instant::now();
-    // configure these as needed
-    let timestamp = String::from("folder3");//Local::now().format("%Y%m%d").to_string();
-    let input_prefix: &str = "xmlreader/"; // path/prefix in the input bucket (can be empty string)
-    let input_bucket: &str = "anxi-temp-testfiles"; // 
-    let output_bucket: &str = "anxi-temp-testfiles";
-    let csv_prefix: &str = "output_csv_file";
-    let max_rows_per_chunk = 40usize; // 1_000_000usize
+    let timestamp = Local::now().format(config::TIME_FORMAT).to_string();
+    let input_prefix: &str = config::INPUT_PREFIX; 
+    let input_bucket: &str = config::INPUT_BUCKET; 
+    let output_bucket: &str = config::OUTPUT_BUCKET;
+    let csv_prefix: &str = config::CSV_PREFIX;
+    let max_rows_per_chunk = config::MAX_ROWS_PER_FILE; 
 
     // init client
     let client: Client = crate::aws::make_s3_client().await;
