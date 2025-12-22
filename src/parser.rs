@@ -44,6 +44,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                 match path_ref.as_slice() {
                     ["AMA_REV.Feed", "Transaction", "Document"] => {
                         rec.issue_date = get_attr_val(&e, b"DateOfIssuance");
+                        rec.validating_carrier = get_attr_val(&e, b"ValidatingCarrier");
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Event", "EntityStatus"] => {
@@ -67,6 +68,14 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         rec.ticket_no = get_attr_val(&e, b"ConjunctiveDocumentNbr");
                         rec.coupon_no = get_attr_val(&e, b"Number");
                         rec.coupon_status = get_attr_val(&e, b"Status");
+                    }
+
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "SegmentInfo", "CompanyDetails", "MarketingCarrier"] => {
+                        rec.marketting_carrier = read_text(reader)?;
+                    }
+
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "SegmentInfo", "CompanyDetails", "OperatingCarrier"] => {
+                        rec.operating_carrier = read_text(reader)?;
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CouponDetails", "FareBasisCode"] => {

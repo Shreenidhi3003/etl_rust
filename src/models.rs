@@ -33,4 +33,7 @@ pub struct Record {
     pub exchange_rate: String,
     pub document_status: String,
     pub trx_revenue_attributable_iata_number: String,
+    pub marketting_carrier: String,
+    pub operating_carrier: String,
+    pub validating_carrier: String,
 }

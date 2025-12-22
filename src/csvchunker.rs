@@ -47,7 +47,7 @@ impl CsvChunkerWriter {
         self.writer.flush()?;
 
         let filename = self.current_name();
-        let key = format!("time_check_release2/{}/{}", self.timestamp, filename);
+        let key = format!("gluejob/{}/{}", self.timestamp, filename);
 
         // read the file contents (async)
         let data = fs::read(&filename).await?;
@@ -83,7 +83,7 @@ impl CsvChunkerWriter {
         self.writer.flush()?;
 
         let filename = self.current_name();
-        let key = format!("time_check_release2/{}/{}", self.timestamp, filename);
+        let key = format!("gluejob/{}/{}", self.timestamp, filename);
         let data = fs::read(&filename).await?;
 
         if Path::new(&filename).exists() {
