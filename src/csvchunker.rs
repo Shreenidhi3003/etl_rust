@@ -5,7 +5,8 @@ use std::fs::File;
 use std::path::Path;
 use aws_sdk_s3::Client;
 use tokio::fs;
-
+use std::path::PathBuf;
+use crate::config;
 
 pub struct CsvChunkerWriter {
     prefix: String,
@@ -23,7 +24,7 @@ impl CsvChunkerWriter {
         let file_index = 1usize;
 
         std::fs::create_dir_all(prefix)?;
-        let filename = format!("{}_{}.csv", prefix, file_index);
+        let filename = PathBuf::from(prefix).join(format!("{}_{}.csv", prefix, file_index));
         let writer = Writer::from_path(&filename)?;
 
         Ok(Self {
@@ -38,16 +39,21 @@ impl CsvChunkerWriter {
         })
     }
 
-    fn current_name(&self) -> String {
-        format!("{}_{}.csv", self.prefix, self.file_index)
+    fn current_path(&self) -> PathBuf {
+        PathBuf::from(&self.prefix).join(format!("{}_{}{}", &self.prefix, &self.file_index, config::EXTENSION))
+    }
+
+    fn key_path(&self) -> String {
+        format!("{}/{}/{}_{}{}",config::FOLDER_NAME,self.timestamp,self.prefix,self.file_index, config::EXTENSION)
     }
 
     async fn rotate(&mut self) -> Result<()> {
         // flush csv writer to ensure content is on disk
         self.writer.flush()?;
 
-        let filename = self.current_name();
-        let key = format!("gluejob/{}/{}", self.timestamp, filename);
+        let filename = self.current_path();
+
+        let key = self.key_path();
 
         // read the file contents (async)
         let data = fs::read(&filename).await?;
@@ -63,7 +69,7 @@ impl CsvChunkerWriter {
         // rotate index and create new writer
         self.file_index += 1;
         self.current_rows = 0;
-        let new_filename = self.current_name();
+        let new_filename = self.current_path();
         self.writer = Writer::from_path(&new_filename)?;
 
         Ok(())
@@ -82,15 +88,20 @@ impl CsvChunkerWriter {
     pub async fn finalize(&mut self) -> Result<()> {
         self.writer.flush()?;
 
-        let filename = self.current_name();
-        let key = format!("gluejob/{}/{}", self.timestamp, filename);
+        let filename = self.current_path();
+        let key = self.key_path();
         let data = fs::read(&filename).await?;
 
+        crate::aws::upload_s3_bytes(&self.client, &key, &self.bucket, data).await?;
+        
         if Path::new(&filename).exists() {
             fs::remove_file(&filename).await?;
         }
 
-        crate::aws::upload_s3_bytes(&self.client, &key, &self.bucket, data).await?;
+        if Path::new(&self.prefix).exists() {
+            fs::remove_dir_all(&self.prefix).await?;
+        }
+
 
         Ok(())
 
