@@ -24,7 +24,7 @@ impl CsvChunkerWriter {
         let file_index = 1usize;
 
         std::fs::create_dir_all(prefix)?;
-        let filename = PathBuf::from(prefix).join(format!("{}_{}.csv", prefix, file_index));
+        let filename = PathBuf::from(prefix).join(format!("{}_{}{}", prefix, file_index, config::EXTENSION));
         let writer = Writer::from_path(&filename)?;
 
         Ok(Self {
