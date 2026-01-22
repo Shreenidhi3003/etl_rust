@@ -69,15 +69,18 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         rec.coupon_no = get_attr_val(&e, b"Number");
                         rec.coupon_status = get_attr_val(&e, b"Status");
                     }
-
+                    
+                    // coupon loop row insertion not required
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "SegmentInfo", "CompanyDetails", "MarketingCarrier"] => {
                         rec.marketting_carrier = read_text(reader)?;
                     }
-
+                    
+                    // coupon loop row insertion not required
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "SegmentInfo", "CompanyDetails", "OperatingCarrier"] => {
                         rec.operating_carrier = read_text(reader)?;
                     }
 
+                    // coupon loop row insertion not required
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CouponDetails", "FareBasisCode"] => {
                         rec.fare_basis = read_text(reader)?;
                     }
@@ -109,6 +112,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         in_coup_standard_comm_amounts_2 = true;
                     }
 
+                    // coupon loop row insertion not required
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponStandardCommission", "Commission", "AccountableEntity", "Amount", "AmountType"]
                         if in_coup_standard_comm_amounts_1 && in_coup_standard_comm_amounts_2 =>
                     {

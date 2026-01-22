@@ -20,7 +20,7 @@ pub struct CsvChunkerWriter {
 }
 
 impl CsvChunkerWriter {
-    pub async fn new(prefix: &str, bucket: &str, max_rows: usize, client: Client, timestamp: &str) -> Result<Self> {
+    pub async fn new(prefix: &str, bucket: &str, max_rows: usize, client: Client, _timestamp: &str) -> Result<Self> {
         let file_index = 1usize;
 
         std::fs::create_dir_all(prefix)?;
@@ -35,9 +35,9 @@ impl CsvChunkerWriter {
             bucket: bucket.to_string(),
             client,
             writer,
-            timestamp: timestamp.to_string(),
+            timestamp: String::from("20251121"),
         })
-    }
+    } // timestamp.to_string()
 
     fn current_path(&self) -> PathBuf {
         PathBuf::from(&self.prefix).join(format!("{}_{}{}", &self.prefix, &self.file_index, config::EXTENSION))
