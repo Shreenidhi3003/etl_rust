@@ -32,6 +32,8 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut waiting_for_amount_proratedfare = false;
     let mut wait_for_cpn_lvl_accounted = false;
     let mut waiting_for_amount_fare_roe = false;
+    let mut wait_for_rem_lvl_accounted = false;
+    let mut wait_for_interline_lvl_accounted = false;
 
     loop {
         match reader.read_event_into(&mut buf)? {
@@ -61,6 +63,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
 
                     ["AMA_REV.Feed", "Transaction", "Document", "BookingInformation", "PNRIdentification", "AmadeusRecordLocator", "ID"] => {
                         rec.pnr_no = read_text(reader)?;
+                        println!("PNR No: {}", rec.pnr_no);
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon"] => {
@@ -153,7 +156,22 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                                wait_for_cpn_lvl_accounted = true;
                             }
                             
-                         }
+                        }
+                    
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "RemittanceTaxesCpnLvl", "RemittanceTaxCpnLvl", "Tax", "AccountableEntity", "Amount", "AmountType"] =>{
+                        let txt = read_text(reader)?;
+                        if txt == "ACCOUNTED" {
+                            wait_for_rem_lvl_accounted = true;
+                        }
+                    }
+
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "InterlineableTaxes", "Tax", "AccountableEntity", "Amount", "AmountType"] =>{
+                        let txt = read_text(reader)?;
+                        if txt == "ACCOUNTED" {
+                            wait_for_interline_lvl_accounted = true;
+                        }
+                    } 
+                         
 
                     ["AMA_REV.Feed", "Transaction", "Document", "StandardCommission", "Commission", "AccountableEntity", "Amount", "AmountType"] => {
                         let txt = read_text(reader)?;
@@ -244,7 +262,8 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                             let amount: f64 = temp_cpnlvl_tax_sum
                                 .parse::<f64>()
                                 .unwrap_or(0.0);
-
+                            
+                            println!("CPN YQ Amount: {}", amount);
                             total_cpn_amount += amount;
 
                             if wait_for_cpn_lvl {
@@ -252,6 +271,34 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                                 rec.cpn_txo_tax_amount_accounting_currency_yq = temp_cpnlvl_tax_sum;
 
                             }
+                            wait_for_cpn_lvl_accounted = false;
+                         }
+                    
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "RemittanceTaxesCpnLvl", "RemittanceTaxCpnLvl", "Tax", "AccountableEntity", "Amount", "Amount"] 
+                        if in_calculated_amounts && wait_for_rem_lvl_accounted => {
+                            let temp_remlvl_tax_sum = get_attr_val(&e, b"Amount"); // String
+
+                            let amount: f64 = temp_remlvl_tax_sum
+                                .parse::<f64>()
+                                .unwrap_or(0.0);
+                            println!("REM YQ Amount: {}", amount);
+
+                            total_cpn_amount += amount;
+                            wait_for_rem_lvl_accounted = false;
+                        }
+                    
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "InterlineableTaxes", "Tax", "AccountableEntity", "Amount", "Amount"] 
+                        if in_calculated_amounts && wait_for_interline_lvl_accounted => {
+                            let temp_interlinelvl_tax_sum = get_attr_val(&e, b"Amount"); // String
+
+                            let amount: f64 = temp_interlinelvl_tax_sum
+                                .parse::<f64>()
+                                .unwrap_or(0.0);
+                            println!("INTERLINE YQ Amount: {}", amount);
+
+                            total_cpn_amount += amount;
+                            wait_for_interline_lvl_accounted = false;
+
                          }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponStandardCommission", "Commission", "AccountableEntity", "Amount", "Amount"]
@@ -291,12 +338,12 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                 }
                 if e.local_name().as_ref() == b"CalculatedAmounts" {
                     in_calculated_amounts = false;
-                    let temp_revenue = temp_cpn_amount + temp_tax_amount;
-                    rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
-                    rec.revenue = temp_revenue.to_string();
-                    temp_cpn_amount = 0.0;
-                    temp_tax_amount = 0.0;
-                    wait_for_cpn_lvl_accounted = false;
+                    // let temp_revenue = temp_cpn_amount + temp_tax_amount;
+                    // // rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
+                    // rec.revenue = temp_revenue.to_string();
+                    // // total_cpn_amount = 0.0;
+                    // temp_cpn_amount = 0.0;
+                    // temp_tax_amount = 0.0;
                     wait_for_cpn_lvl = false;
                     waiting_for_amount_proratedfare = false;
                 }
@@ -304,10 +351,30 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     in_coup_standard_comm_amounts_1 = false;
                     in_coup_standard_comm_amounts_2 = false;
                 }
+                
+                
+                
+                if e.local_name().as_ref() == b"CouponTaxes" {
+                    // push record for completed transaction and reset
+                    let temp_revenue = temp_cpn_amount + temp_tax_amount;
+                    // rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
+                    rec.revenue = temp_revenue.to_string();
+                    // total_cpn_amount = 0.0;
+                    temp_cpn_amount = 0.0;
+                    temp_tax_amount = 0.0;
+                    
+
+                    rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
+                    rows.push(rec.clone());
+                    total_cpn_amount = 0.0;
+                    // wait_for_cpn_lvl_accounted = false;
+                    // wait_for_rem_lvl_accounted = false;
+                    // wait_for_interline_lvl_accounted = false;
+                }
 
                 if e.local_name().as_ref() == b"Transaction" {
                     // push record for completed transaction and reset
-                    rows.push(rec);
+                    // rows.push(rec.clone());
                     rec = Record::default();
                 }
 
