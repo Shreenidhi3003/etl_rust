@@ -35,7 +35,7 @@ impl CsvChunkerWriter {
             bucket: bucket.to_string(),
             client,
             writer,
-            timestamp: String::from("20251119"),
+            timestamp: String::from("20251115"),
         })
     } // timestamp.to_string()
 

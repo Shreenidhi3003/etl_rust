@@ -34,6 +34,9 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut waiting_for_amount_fare_roe = false;
     let mut wait_for_rem_lvl_accounted = false;
     let mut wait_for_interline_lvl_accounted = false;
+    let mut in_standard_comm_amounts = false;
+    let mut in_supp_comm_amounts = false;
+    let mut in_prorated_source = false;
 
     loop {
         match reader.read_event_into(&mut buf)? {
@@ -63,7 +66,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
 
                     ["AMA_REV.Feed", "Transaction", "Document", "BookingInformation", "PNRIdentification", "AmadeusRecordLocator", "ID"] => {
                         rec.pnr_no = read_text(reader)?;
-                        println!("PNR No: {}", rec.pnr_no);
+                        // println!("PNR No: {}", rec.pnr_no);
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon"] => {
@@ -112,7 +115,11 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponStandardCommission", "Commission"] => {
-                        in_coup_standard_comm_amounts_2 = true;
+                        let commision_type = get_attr_val(&e, b"CommissionType");
+                        let share_indicator = get_attr_val(&e, b"ShareIndicator");
+                        if commision_type == "COAM" && share_indicator == "Y" {
+                            in_coup_standard_comm_amounts_2 = true;
+                        }
                     }
 
                     // coupon loop row insertion not required
@@ -129,14 +136,22 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         in_calculated_amounts = true;
                     }
 
-                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponProratedFare", "AccountableEntity", "Amount", "AmountType"]
-                        if in_calculated_amounts =>
-                    {
-                        let txt = read_text(reader)?;
-                        if txt == "ACCOUNTED" {
-                            waiting_for_amount_proratedfare = true;
-                        }
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponProratedFare"] 
+                        if in_calculated_amounts => {
+                            let proration_source = get_attr_val(&e, b"ProrationSource");
+                            if proration_source == "1A_SPA" {
+                                in_prorated_source = true;
+                            }
                     }
+
+                    ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponProratedFare", "AccountableEntity", "Amount", "AmountType"]
+                        if in_prorated_source =>
+                        {
+                            let txt = read_text(reader)?;
+                            if txt == "ACCOUNTED" {
+                                waiting_for_amount_proratedfare = true;
+                            }
+                        }
 
                     // for revenue 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "CollectedTaxesCpnLvl", "Tax"] => {
@@ -150,7 +165,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                          }
                     
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "CollectedTaxesCpnLvl", "Tax", "AccountableEntity", "Amount", "AmountType"] 
-                        if wait_for_cpn_lvl => {
+                        => {
                             let txt = read_text(reader)?;
                             if txt == "ACCOUNTED" {
                                wait_for_cpn_lvl_accounted = true;
@@ -171,20 +186,35 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                             wait_for_interline_lvl_accounted = true;
                         }
                     } 
-                         
-
-                    ["AMA_REV.Feed", "Transaction", "Document", "StandardCommission", "Commission", "AccountableEntity", "Amount", "AmountType"] => {
-                        let txt = read_text(reader)?;
-                        if txt == "ACCOUNTED" {
-                            waiting_for_std_comm_amount = true;
+                    
+                    ["AMA_REV.Feed", "Transaction", "Document", "StandardCommission", "Commission"] => {
+                        let std_commision_type = get_attr_val(&e, b"CommissionType");
+                        if std_commision_type == " " {
+                            in_standard_comm_amounts = true;
                         }
                     }
 
-                    ["AMA_REV.Feed", "Transaction", "Document", "SupplementaryCommission", "Commission", "AccountableEntity", "Amount", "AmountType"] => {
-                        let txt = read_text(reader)?;
-                        if txt == "ACCOUNTED" {
-                            waiting_for_supp_comm_amount = true;
+                    ["AMA_REV.Feed", "Transaction", "Document", "StandardCommission", "Commission", "AccountableEntity", "Amount", "AmountType"] 
+                        if in_standard_comm_amounts => {
+                            let txt = read_text(reader)?;
+                            if txt == "ACCOUNTED" {
+                                waiting_for_std_comm_amount = true;
+                            }
                         }
+
+                    ["AMA_REV.Feed", "Transaction", "Document", "SupplementaryCommission", "Commission"] => {
+                        let std_commision_type = get_attr_val(&e, b"CommissionType");
+                        if std_commision_type == " " {
+                            in_supp_comm_amounts = true;
+                        }
+                    }
+
+                    ["AMA_REV.Feed", "Transaction", "Document", "SupplementaryCommission", "Commission", "AccountableEntity", "Amount", "AmountType"] 
+                        if in_supp_comm_amounts=> {
+                            let txt = read_text(reader)?;
+                            if txt == "ACCOUNTED" {
+                                waiting_for_supp_comm_amount = true;
+                            }
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "SegmentInfo"] => {
@@ -225,27 +255,27 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Fares", "Fare", "AccountableEntity", "Amount", "Amount"]
-                        if in_pricing_fares && waiting_for_amount_fare =>
-                    {
-                        let amt = get_attr_val(&e, b"Amount");
-                        if last_fare_type == "NET" {
-                            rec.net_fare_amount_accounting_currency = amt;
-                        } else if last_fare_type == "PUBLISHED" {
-                            rec.pub_fare_amount_accounting_currency = amt;
-                        } else if last_fare_type == "ADDITIONAL_COLLECTION" {
-                            rec.bal_exchange_additional_collected_fare_amount_accounting_currency = amt;
+                        if in_pricing_fares && waiting_for_amount_fare => {
+                            let amt = get_attr_val(&e, b"Amount");
+                            if last_fare_type == "NET" {
+                                rec.net_fare_amount_accounting_currency = amt;
+                            } else if last_fare_type == "PUBLISHED" {
+                                rec.pub_fare_amount_accounting_currency = amt;
+                            } else if last_fare_type == "ADDITIONAL_COLLECTION" {
+                                rec.bal_exchange_additional_collected_fare_amount_accounting_currency = amt;
+                            }
+                            waiting_for_amount_fare = false;
                         }
-                        waiting_for_amount_fare = false;
-                    }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponProratedFare", "AccountableEntity", "Amount", "Amount"]
                         if in_calculated_amounts && waiting_for_amount_proratedfare =>
-                    {
-                        let temp_val = get_attr_val(&e, b"Amount");
-                        temp_cpn_amount = temp_val.parse::<f64>().unwrap_or(0.0);
-                        rec.cpn_far_fare_amount_accounting_currency = temp_val;
-                        waiting_for_amount_proratedfare = false;
-                    }
+                        {
+                            let temp_val = get_attr_val(&e, b"Amount");
+                            temp_cpn_amount = temp_val.parse::<f64>().unwrap_or(0.0);
+                            rec.cpn_far_fare_amount_accounting_currency = temp_val;
+                            waiting_for_amount_proratedfare = false;
+                            in_prorated_source = false;
+                        }
 
                     // ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "CollectedTaxesCpnLvl", "Tax", "AccountableEntity", "Amount", "Amount"] 
                     //     if in_calculated_amounts && wait_for_cpn_lvl_accounted && wait_for_cpn_lvl => {
@@ -263,7 +293,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                                 .parse::<f64>()
                                 .unwrap_or(0.0);
                             
-                            println!("CPN YQ Amount: {}", amount);
+                            // println!("CPN YQ Amount: {}", amount);
                             total_cpn_amount += amount;
 
                             if wait_for_cpn_lvl {
@@ -281,7 +311,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                             let amount: f64 = temp_remlvl_tax_sum
                                 .parse::<f64>()
                                 .unwrap_or(0.0);
-                            println!("REM YQ Amount: {}", amount);
+                            // println!("REM YQ Amount: {}", amount);
 
                             total_cpn_amount += amount;
                             wait_for_rem_lvl_accounted = false;
@@ -294,7 +324,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                             let amount: f64 = temp_interlinelvl_tax_sum
                                 .parse::<f64>()
                                 .unwrap_or(0.0);
-                            println!("INTERLINE YQ Amount: {}", amount);
+                            // println!("INTERLINE YQ Amount: {}", amount);
 
                             total_cpn_amount += amount;
                             wait_for_interline_lvl_accounted = false;
@@ -303,23 +333,24 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponStandardCommission", "Commission", "AccountableEntity", "Amount", "Amount"]
                         if in_coup_standard_comm_amounts_1 && in_coup_standard_comm_amounts_2 && waiting_for_coup_standard_comm_amount =>
-                    {
-                        rec.cpn_std_commission_amount_accounting_currency = get_attr_val(&e, b"Amount");
-                        waiting_for_coup_standard_comm_amount = false;
-                    }
+                        {
+                            rec.cpn_std_commission_amount_accounting_currency = get_attr_val(&e, b"Amount");
+                            waiting_for_coup_standard_comm_amount = false;
+                        }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "StandardCommission", "Commission", "AccountableEntity", "Amount", "Amount"]
                         if waiting_for_std_comm_amount =>
                     {
                         rec.std_commission_amount_accounting_currency = get_attr_val(&e, b"Amount");
                         waiting_for_std_comm_amount = false;
+                        in_standard_comm_amounts = false;
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "SupplementaryCommission", "Commission", "AccountableEntity", "Amount", "Amount"]
-                        if waiting_for_supp_comm_amount =>
-                    {
-                        rec.sup_commision_amount_accounting_currency = get_attr_val(&e, b"Amount");
-                        waiting_for_supp_comm_amount = false;
+                        if waiting_for_supp_comm_amount => {
+                            rec.sup_commision_amount_accounting_currency = get_attr_val(&e, b"Amount");
+                            waiting_for_supp_comm_amount = false;
+                            in_supp_comm_amounts = false;
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "PricingDetails", "RevenueAttributableAgent"] => {
