@@ -336,6 +336,8 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         {
                             rec.cpn_std_commission_amount_accounting_currency = get_attr_val(&e, b"Amount");
                             waiting_for_coup_standard_comm_amount = false;
+                            in_coup_standard_comm_amounts_1 = false;
+                            in_coup_standard_comm_amounts_2 = false;
                         }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "StandardCommission", "Commission", "AccountableEntity", "Amount", "Amount"]
@@ -378,14 +380,13 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     wait_for_cpn_lvl = false;
                     waiting_for_amount_proratedfare = false;
                 }
-                if e.local_name().as_ref() == b"CouponStandardCommission" {
-                    in_coup_standard_comm_amounts_1 = false;
-                    in_coup_standard_comm_amounts_2 = false;
-                }
+                // if e.local_name().as_ref() == b"CouponStandardCommission" {
+                    
+                // }
                 
                 
                 
-                if e.local_name().as_ref() == b"CouponTaxes" {
+                if e.local_name().as_ref() == b"Coupon" {
                     // push record for completed transaction and reset
                     let temp_revenue = temp_cpn_amount + temp_tax_amount;
                     // rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
