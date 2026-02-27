@@ -56,6 +56,10 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         rec.document_status = read_text(reader)?;
                     }
 
+                    ["AMA_REV.Feed", "Transaction", "Event", "Event"] => {
+                        rec.event_status = read_text(reader)?;
+                    }
+
                     ["AMA_REV.Feed", "Transaction", "Document", "PricingDetails", "CurrencyOfPayment"] => {
                         rec.currency = read_text(reader)?;
                     }

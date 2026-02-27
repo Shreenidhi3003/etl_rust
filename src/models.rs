@@ -2,6 +2,7 @@ use serde::Serialize;
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Record {
+    pub event_status: String,
     pub primary_ticket_no: String,
     pub ticket_no: String,
     pub coupon_no: String,
