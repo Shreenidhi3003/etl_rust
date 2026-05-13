@@ -8,15 +8,14 @@ use anyhow::Result;
 use aws_sdk_s3::Client;
 use quick_xml::Reader;
 use std::io::Cursor;
-use chrono::Local;
 use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
 
     let start_time = Instant::now();
-    let timestamp = Local::now().format(config::TIME_FORMAT).to_string();
-    let input_prefix: &str = config::INPUT_PREFIX; 
+    let timestamp: &str =  config::TIME_STAMP;//Local::now().format(config::TIME_FORMAT).to_string();
+    let input_prefix: String = config::inputprefix(); 
     let input_bucket: &str = config::INPUT_BUCKET; 
     let output_bucket: &str = config::OUTPUT_BUCKET;
     let csv_prefix: &str = config::CSV_PREFIX;
@@ -26,7 +25,7 @@ async fn main() -> Result<()> {
     let client: Client = crate::aws::make_s3_client().await;
 
     // list keys (propagate errors)
-    let list_of_keys = crate::aws::list_of_xml_from_s3(&client, input_bucket, input_prefix).await?;
+    let list_of_keys = crate::aws::list_of_xml_from_s3(&client, input_bucket, &input_prefix).await?;
 
     // create csv chunker (clone client because CsvChunker takes an owned Client)
     let mut csv_writer = crate::csvchunker::CsvChunkerWriter::new(
@@ -34,7 +33,7 @@ async fn main() -> Result<()> {
         output_bucket,
         max_rows_per_chunk,
         client.clone(),
-        timestamp.as_str(),
+        timestamp,
     )
     .await?;
 
