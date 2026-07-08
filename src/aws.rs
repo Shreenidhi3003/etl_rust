@@ -1,6 +1,6 @@
+use anyhow::Result;
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::{Client, primitives::ByteStream};
-use anyhow::Result;
 
 pub async fn make_s3_client() -> Client {
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
@@ -12,7 +12,6 @@ pub async fn list_of_xml_from_s3(
     bucket: &str,
     prefix: &str,
 ) -> Result<Vec<String>> {
-
     let list_of_objects = client
         .list_objects_v2()
         .bucket(bucket)
@@ -32,13 +31,17 @@ pub async fn list_of_xml_from_s3(
     Ok(keys_in_vec)
 }
 
-
 pub async fn get_object_body(client: &Client, key: &str, bucket: &str) -> Result<ByteStream> {
     let resp = client.get_object().bucket(bucket).key(key).send().await?;
     Ok(resp.body)
 }
 
-pub async fn upload_s3_bytes(client: &Client, key: &str, bucket: &str, data: Vec<u8>) -> Result<()> {
+pub async fn upload_s3_bytes(
+    client: &Client,
+    key: &str,
+    bucket: &str,
+    data: Vec<u8>,
+) -> Result<()> {
     client
         .put_object()
         .bucket(bucket)

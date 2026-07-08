@@ -1,0 +1,7 @@
+target/
+.git/
+.gitignore
+.gitattributes
+Dockerfile
+README_DOCKER_BATCH.md
+*.log

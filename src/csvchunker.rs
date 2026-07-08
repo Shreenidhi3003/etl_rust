@@ -1,12 +1,12 @@
+use crate::config;
 use crate::models::Record;
 use anyhow::{Ok, Result};
+use aws_sdk_s3::Client;
 use csv::Writer;
 use std::fs::File;
 use std::path::Path;
-use aws_sdk_s3::Client;
-use tokio::fs;
 use std::path::PathBuf;
-use crate::config;
+use tokio::fs;
 
 pub struct CsvChunkerWriter {
     prefix: String,
@@ -20,11 +20,18 @@ pub struct CsvChunkerWriter {
 }
 
 impl CsvChunkerWriter {
-    pub async fn new(prefix: &str, bucket: &str, max_rows: usize, client: Client, timestamp: &str) -> Result<Self> {
+    pub async fn new(
+        prefix: &str,
+        bucket: &str,
+        max_rows: usize,
+        client: Client,
+        timestamp: &str,
+    ) -> Result<Self> {
         let file_index = 1usize;
 
         std::fs::create_dir_all(prefix)?;
-        let filename = PathBuf::from(prefix).join(format!("{}_{}{}", prefix, file_index, config::EXTENSION));
+        let filename =
+            PathBuf::from(prefix).join(format!("{}_{}{}", prefix, file_index, config::EXTENSION));
         let writer = Writer::from_path(&filename)?;
 
         Ok(Self {
@@ -40,11 +47,23 @@ impl CsvChunkerWriter {
     } // timestamp.to_string()
 
     fn current_path(&self) -> PathBuf {
-        PathBuf::from(&self.prefix).join(format!("{}_{}{}", &self.prefix, &self.file_index, config::EXTENSION))
+        PathBuf::from(&self.prefix).join(format!(
+            "{}_{}{}",
+            &self.prefix,
+            &self.file_index,
+            config::EXTENSION
+        ))
     }
 
     fn key_path(&self) -> String {
-        format!("{}/{}/{}_{}{}",config::FOLDER_NAME,self.timestamp,self.prefix,self.file_index, config::EXTENSION)
+        format!(
+            "{}/{}/{}_{}{}",
+            config::FOLDER_NAME,
+            self.timestamp,
+            self.prefix,
+            self.file_index,
+            config::EXTENSION
+        )
     }
 
     async fn rotate(&mut self) -> Result<()> {
@@ -93,7 +112,7 @@ impl CsvChunkerWriter {
         let data = fs::read(&filename).await?;
 
         crate::aws::upload_s3_bytes(&self.client, &key, &self.bucket, data).await?;
-        
+
         if Path::new(&filename).exists() {
             fs::remove_file(&filename).await?;
         }
@@ -102,9 +121,6 @@ impl CsvChunkerWriter {
             fs::remove_dir_all(&self.prefix).await?;
         }
 
-
         Ok(())
-
-
     }
 }

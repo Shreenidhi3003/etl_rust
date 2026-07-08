@@ -1,8 +1,8 @@
 mod aws;
-mod parser;
-mod models;
-mod csvchunker;
 mod config;
+mod csvchunker;
+mod models;
+mod parser;
 
 use anyhow::Result;
 use aws_sdk_s3::Client;
@@ -12,57 +12,59 @@ use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
     let start_time = Instant::now();
-    let timestamp: &str =  config::TIME_STAMP;//Local::now().format(config::TIME_FORMAT).to_string();
-    let input_prefix: String = config::inputprefix(); 
-    let input_bucket: &str = config::INPUT_BUCKET; 
+    let input_bucket: &str = config::INPUT_BUCKET;
     let output_bucket: &str = config::OUTPUT_BUCKET;
     let csv_prefix: &str = config::CSV_PREFIX;
-    let max_rows_per_chunk = config::MAX_ROWS_PER_FILE; 
+    let max_rows_per_chunk = config::MAX_ROWS_PER_FILE;
 
     // init client
     let client: Client = crate::aws::make_s3_client().await;
 
-    // list keys (propagate errors)
-    let list_of_keys = crate::aws::list_of_xml_from_s3(&client, input_bucket, &input_prefix).await?;
+    for timestamp in config::TIME_STAMPS {
+        println!("Processing timestamp {}", timestamp);
+        let input_prefix: String = config::inputprefix(timestamp);
 
-    // create csv chunker (clone client because CsvChunker takes an owned Client)
-    let mut csv_writer = crate::csvchunker::CsvChunkerWriter::new(
-        csv_prefix,
-        output_bucket,
-        max_rows_per_chunk,
-        client.clone(),
-        timestamp,
-    )
-    .await?;
+        // list keys (propagate errors)
+        let list_of_keys =
+            crate::aws::list_of_xml_from_s3(&client, input_bucket, &input_prefix).await?;
 
-    for key in list_of_keys {
-        println!("Processing {:?}", key);
+        // create csv chunker (clone client because CsvChunker takes an owned Client)
+        let mut csv_writer = crate::csvchunker::CsvChunkerWriter::new(
+            csv_prefix,
+            output_bucket,
+            max_rows_per_chunk,
+            client.clone(),
+            timestamp,
+        )
+        .await?;
 
-        // get object body as ByteStream and collect bytes
-        let body_stream = crate::aws::get_object_body(&client, &key, input_bucket).await?;
-        let collected = body_stream.collect().await?;
-        let bytes = collected.into_bytes().to_vec();
+        for key in list_of_keys {
+            println!("Processing {:?}", key);
 
-        // build a Reader from the downloaded bytes
-        let mut xml_reader = Reader::from_reader(Cursor::new(bytes));
-        xml_reader.trim_text(true);
+            // get object body as ByteStream and collect bytes
+            let body_stream = crate::aws::get_object_body(&client, &key, input_bucket).await?;
+            let collected = body_stream.collect().await?;
+            let bytes = collected.into_bytes().to_vec();
 
-        // parse XML into Vec<Record>
-        let records = crate::parser::parse_xml(&mut xml_reader)?;
-        println!("Parsed {} records", records.len());
+            // build a Reader from the downloaded bytes
+            let mut xml_reader = Reader::from_reader(Cursor::new(bytes));
+            xml_reader.trim_text(true);
 
-        // write entries into CSV chunker
-        for rec in records {
-            csv_writer.write_record(&rec).await?;
+            // parse XML into Vec<Record>
+            let records = crate::parser::parse_xml(&mut xml_reader)?;
+            println!("Parsed {} records", records.len());
+
+            // write entries into CSV chunker
+            for rec in records {
+                csv_writer.write_record(&rec).await?;
+            }
         }
-    }
 
-    csv_writer.finalize().await?;
+        csv_writer.finalize().await?;
+    }
     let duration = start_time.elapsed();
     println!("Processing completed in: {:?}", duration);
-     
 
     Ok(())
 }
