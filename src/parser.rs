@@ -50,6 +50,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     ["AMA_REV.Feed", "Transaction", "Document"] => {
                         rec.issue_date = get_attr_val(&e, b"DateOfIssuance");
                         rec.validating_carrier = get_attr_val(&e, b"ValidatingCarrier");
+                        rec.issue_indicator = get_attr_val(&e, b"IssueIndicator");
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Event", "EntityStatus"] => {
@@ -275,7 +276,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         let nature_code = get_attr_val(&e, b"NatureCode");
                         let iso_code = get_attr_val(&e, b"ISOCode");
                         let is_refundable = get_attr_val(&e, b"IsRefundable");
-                        if nature_code == "AC" && iso_code == "YQ" && is_refundable == "N" {
+                        if (nature_code == "AC" || nature_code == "AD") && iso_code == "YQ" && is_refundable == "N" {
                             wait_for_cpn_lvl = true
                         }
                     }
@@ -532,7 +533,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         total_cpn_amount += amount;
 
                         if wait_for_cpn_lvl {
-                            temp_tax_amount = amount;
+                            temp_tax_amount += amount;
                             rec.cpn_txo_tax_amount_accounting_currency_yq = temp_cpnlvl_tax_sum;
                         }
                         wait_for_cpn_lvl_accounted = false;
@@ -664,12 +665,16 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     // // total_cpn_amount = 0.0;
                     // temp_cpn_amount = 0.0;
                     // temp_tax_amount = 0.0;
-                    wait_for_cpn_lvl = false;
+                    // wait_for_cpn_lvl = false;
                     waiting_for_amount_proratedfare = false;
                 }
                 // if e.local_name().as_ref() == b"CouponStandardCommission" {
 
                 // }
+
+                if e.local_name().as_ref() == b"Tax" {
+                    wait_for_cpn_lvl = false;
+                }
 
                 if e.local_name().as_ref() == b"Coupon" {
                     // push record for completed transaction and reset

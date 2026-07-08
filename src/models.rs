@@ -37,4 +37,5 @@ pub struct Record {
     pub marketting_carrier: String,
     pub operating_carrier: String,
     pub validating_carrier: String,
+    pub issue_indicator: String,
 }
