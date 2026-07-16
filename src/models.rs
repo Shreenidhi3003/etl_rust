@@ -39,4 +39,5 @@ pub struct Record {
     pub validating_carrier: String,
     pub issue_indicator: String,
     pub passenger_type_code: String,
+    pub document_type: String,
 }

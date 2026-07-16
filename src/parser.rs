@@ -55,6 +55,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         rec.issue_date = get_attr_val(&e, b"DateOfIssuance");
                         rec.validating_carrier = get_attr_val(&e, b"ValidatingCarrier");
                         rec.issue_indicator = get_attr_val(&e, b"IssueIndicator");
+                        rec.document_type = get_attr_val(&e, b"Type");
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Event", "EntityStatus"] => {
