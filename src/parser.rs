@@ -105,6 +105,8 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         let coupon_no = get_attr_val(&e, b"Number");
                         if let Some(c) = farecomponent.get(&coupon_no) {
                             rec.passenger_type_code = c.clone();
+                        } else {
+                            rec.passenger_type_code = String::new();
                         }
                         rec.coupon_no = coupon_no;
                         rec.coupon_status = get_attr_val(&e, b"Status");
@@ -735,6 +737,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                 if e.local_name().as_ref() == b"Transaction" {
                     // push record for completed transaction and reset
                     // rows.push(rec.clone());
+                    farecomponent.clear();
                     rec = Record::default();
                 }
 
