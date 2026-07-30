@@ -19,6 +19,8 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut total_cpn_amount: f64 = 0.0;
     let mut temp_cpn_amount: f64 = 0.0;
     let mut temp_tax_amount: f64 = 0.0;
+    let mut temp_tax_amount_yr: f64 = 0.0;
+    let mut temp_cpn_amount_spam: f64 = 0.0;
 
     // let mut farecomponent:HashMap<String, String> = HashMap::new();
     // let mut farecouponnumber:String = String::new();
@@ -29,11 +31,13 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut in_calculated_amounts = false;
     let mut in_pricing_fares = false;
     let mut wait_for_cpn_lvl = false;
+    let mut wait_for_cpn_lvl_yr = false;
     let mut waiting_for_amount_fare = false;
     let mut waiting_for_coup_standard_comm_amount = false;
     let mut waiting_for_std_comm_amount = false;
     let mut waiting_for_supp_comm_amount = false;
     let mut waiting_for_amount_proratedfare = false;
+    let mut waiting_for_amount_suppcommissiontype = false;
     let mut wait_for_cpn_lvl_accounted = false;
     let mut waiting_for_amount_fare_roe = false;
     let mut wait_for_rem_lvl_accounted = false;
@@ -41,6 +45,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut in_standard_comm_amounts = false;
     let mut in_supp_comm_amounts = false;
     let mut in_prorated_source = false;
+    let mut in_suppcommissiontype = false;
 
     loop {
         match reader.read_event_into(&mut buf)? {
@@ -243,6 +248,41 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         in_calculated_amounts = true;
                     }
 
+                    // --------------------------
+                    [
+                        "AMA_REV.Feed",
+                        "Transaction",
+                        "Document",
+                        "Coupon",
+                        "CalculatedAmounts",
+                        "CouponSuppCommission",
+                        "Commission",
+                    ] if in_calculated_amounts => {
+                        let suppcommissiontype = get_attr_val(&e, b"CommissionType");
+                        if suppcommissiontype == "SPAM" {
+                            in_suppcommissiontype = true;
+                        }
+                    }
+
+                    [
+                        "AMA_REV.Feed",
+                        "Transaction",
+                        "Document",
+                        "Coupon",
+                        "CalculatedAmounts",
+                        "CouponSuppCommission",
+                        "Commission",
+                        "AccountableEntity",
+                        "Amount",
+                        "AmountType",
+                    ] if in_suppcommissiontype => {
+                        let txt = read_text(reader)?;
+                        if txt == "ACCOUNTED" {
+                            waiting_for_amount_suppcommissiontype = true;
+                        }
+                    }
+                    // --------------------------
+
                     [
                         "AMA_REV.Feed",
                         "Transaction",
@@ -251,10 +291,11 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         "CalculatedAmounts",
                         "CouponProratedFare",
                     ] if in_calculated_amounts => {
-                        let proration_source = get_attr_val(&e, b"ProrationSource");
-                        if proration_source == "1A_SPA" {
-                            in_prorated_source = true;
-                        }
+                        // let proration_source = get_attr_val(&e, b"ProrationSource");
+                        // if proration_source == "1A_SPA" {
+                        //     in_prorated_source = true;
+                        // }
+                        in_prorated_source = true;
                     }
 
                     [
@@ -288,8 +329,10 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         let nature_code = get_attr_val(&e, b"NatureCode");
                         let iso_code = get_attr_val(&e, b"ISOCode");
                         let is_refundable = get_attr_val(&e, b"IsRefundable");
-                        if (nature_code == "AC" || nature_code == "AD") && iso_code == "YQ" && is_refundable == "N" {
+                        if (nature_code == "AC" || nature_code == "AD") && (iso_code == "YQ") && is_refundable == "N" {
                             wait_for_cpn_lvl = true
+                        } else if iso_code == "YR" {
+                            wait_for_cpn_lvl_yr = true
                         }
                     }
 
@@ -526,6 +569,25 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         in_prorated_source = false;
                     }
 
+                    [
+                        "AMA_REV.Feed",
+                        "Transaction",
+                        "Document",
+                        "Coupon",
+                        "CalculatedAmounts",
+                        "CouponSuppCommission",
+                        "Commission ",
+                        "AccountableEntity",
+                        "Amount",
+                        "Amount",
+                    ] if in_calculated_amounts && waiting_for_amount_suppcommissiontype => {
+                        let temp_val = get_attr_val(&e, b"Amount");
+                        temp_cpn_amount_spam = temp_val.parse::<f64>().unwrap_or(0.0);
+                        // rec.cpn_far_fare_amount_accounting_currency = temp_val;
+                        waiting_for_amount_suppcommissiontype = false;
+                        in_suppcommissiontype = false;
+                    }
+
                     // ["AMA_REV.Feed", "Transaction", "Document", "Coupon", "CalculatedAmounts", "CouponTaxes", "CollectedTaxesCpnLvl", "Tax", "AccountableEntity", "Amount", "Amount"]
                     //     if in_calculated_amounts && wait_for_cpn_lvl_accounted && wait_for_cpn_lvl => {
                     //         let temp_cpnlvl = get_attr_val(&e, b"Amount");
@@ -556,7 +618,10 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         if wait_for_cpn_lvl {
                             temp_tax_amount += amount;
                             rec.cpn_txo_tax_amount_accounting_currency_yq = temp_cpnlvl_tax_sum;
+                        } else if wait_for_cpn_lvl_yr {
+                            temp_tax_amount_yr += amount;
                         }
+                        
                         wait_for_cpn_lvl_accounted = false;
                     }
 
@@ -721,6 +786,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
 
                 if e.local_name().as_ref() == b"Tax" {
                     wait_for_cpn_lvl = false;
+                    wait_for_cpn_lvl_yr = false;
                 }
 
                 // if e.local_name().as_ref() == b"FareComponent" {
@@ -729,15 +795,22 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
 
                 if e.local_name().as_ref() == b"Coupon" {
                     // push record for completed transaction and reset
-                    let temp_revenue = temp_cpn_amount + temp_tax_amount;
+                    let temp_revenue = (temp_cpn_amount + temp_tax_amount + temp_tax_amount_yr) - temp_cpn_amount_spam ;
+                    // let temp_revenue = temp_cpn_amount + temp_tax_amount + temp_tax_amount_yr - temp_cpn_amount_spam ;
                     // rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
+                    rec.prorated_fare_myr = temp_cpn_amount.to_string();
+                    rec.coupon_yq_myr = temp_tax_amount.to_string();
+                    rec.coupon_yr_myr = temp_tax_amount_yr.to_string();
+                    rec.coupon_spam_myr = temp_cpn_amount_spam.to_string();
                     rec.revenue = temp_revenue.to_string();
                     // total_cpn_amount = 0.0;
                     temp_cpn_amount = 0.0;
                     temp_tax_amount = 0.0;
+                    temp_tax_amount_yr = 0.0;
+                    temp_cpn_amount_spam = 0.0;
 
                     rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
-                    println!("Pushed record: {:?}", rec);
+                    // println!("Pushed record: {:?}", rec);
                     rows.push(rec.clone());
                     total_cpn_amount = 0.0;
                     // wait_for_cpn_lvl_accounted = false;

@@ -40,4 +40,8 @@ pub struct Record {
     pub issue_indicator: String,
     pub passenger_type_code: String,
     pub document_type: String,
+    pub prorated_fare_myr: String,
+    pub coupon_yq_myr: String,
+    pub coupon_yr_myr: String,
+    pub coupon_spam_myr: String,
 }
