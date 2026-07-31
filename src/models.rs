@@ -44,4 +44,5 @@ pub struct Record {
     pub coupon_yq_myr: String,
     pub coupon_yr_myr: String,
     pub coupon_spam_myr: String,
+    pub event_type_short_code: String,
 }

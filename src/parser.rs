@@ -1,7 +1,7 @@
 use anyhow::Result;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-// use std::collections::HashMap;
+use std::collections::HashMap;
 use std::io::BufRead;
 
 use crate::models::Record;
@@ -22,8 +22,8 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut temp_tax_amount_yr: f64 = 0.0;
     let mut temp_cpn_amount_spam: f64 = 0.0;
 
-    // let mut farecomponent:HashMap<String, String> = HashMap::new();
-    // let mut farecouponnumber:String = String::new();
+    let mut farecomponent:HashMap<String, String> = HashMap::new();
+    let mut farecouponnumber:String = String::new();
 
     // STATE FLAGS
     let mut in_coup_standard_comm_amounts_1 = false;
@@ -71,6 +71,10 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         rec.event_status = read_text(reader)?;
                     }
 
+                    ["AMA_REV.Feed", "Transaction", "Event", "EventTypeShortCode"] => {
+                        rec.event_type_short_code = read_text(reader)?;
+                    }
+
                     [
                         "AMA_REV.Feed",
                         "Transaction",
@@ -107,14 +111,14 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon"] => {
                         rec.primary_ticket_no = get_attr_val(&e, b"DocumentNbr");
                         rec.ticket_no = get_attr_val(&e, b"ConjunctiveDocumentNbr");
-                        rec.coupon_no = get_attr_val(&e, b"Number");
-                        // let coupon_no = get_attr_val(&e, b"Number");
-                        // if let Some(c) = farecomponent.get(&coupon_no) {
-                        //     rec.passenger_type_code = c.clone();
-                        // } else {
-                        //     rec.passenger_type_code = String::new();
-                        // }
-                        // rec.coupon_no = coupon_no;
+                        // rec.coupon_no = get_attr_val(&e, b"Number");
+                        let coupon_no = get_attr_val(&e, b"Number");
+                        if let Some(c) = farecomponent.get(&coupon_no) {
+                            rec.passenger_type_code = c.clone();
+                        } else {
+                            rec.passenger_type_code = String::new();
+                        }
+                        rec.coupon_no = coupon_no;
                         rec.coupon_status = get_attr_val(&e, b"Status");
                     }
 
@@ -520,14 +524,15 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         rec.distribution_channel = get_attr_val(&e, b"OfficeId");
                     }
 
-                    [
-                        "AMA_REV.Feed",
-                        "Transaction",
-                        "Document",
-                        "PassengerInformation",
-                    ] => {
-                        rec.passenger_type_code = get_attr_val(&e, b"PassengerTypeCode");
-                    }
+                    //  use this for prod passenger type code when files are unmasked
+                    // [
+                    //     "AMA_REV.Feed",
+                    //     "Transaction",
+                    //     "Document",
+                    //     "PassengerInformation",
+                    // ] => {
+                    //     rec.passenger_type_code = get_attr_val(&e, b"PassengerTypeCode");
+                    // }
 
                     [
                         "AMA_REV.Feed",
@@ -576,7 +581,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         "Coupon",
                         "CalculatedAmounts",
                         "CouponSuppCommission",
-                        "Commission ",
+                        "Commission",
                         "AccountableEntity",
                         "Amount",
                         "Amount",
@@ -733,31 +738,31 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                             get_attr_val(&e, b"AgencyNumber");
                     }
 
-                    // [
-                    //     "AMA_REV.Feed",
-                    //     "Transaction",
-                    //     "Document",
-                    //     "PricingDetails",
-                    //     "FareComponent",
-                    //     "RelatedCoupon",
-                    // ] => {
-                    //     farecouponnumber = get_attr_val(&e, b"CouponNumber");
-                    // }
+                    [
+                        "AMA_REV.Feed",
+                        "Transaction",
+                        "Document",
+                        "PricingDetails",
+                        "FareComponent",
+                        "RelatedCoupon",
+                    ] => {
+                        farecouponnumber = get_attr_val(&e, b"CouponNumber");
+                    }
 
-                    // [
-                    //     "AMA_REV.Feed",
-                    //     "Transaction",
-                    //     "Document",
-                    //     "PricingDetails",
-                    //     "FareComponent",
-                    //     "SSPFareInformation",
-                    //     "PassengerTypeCode",
-                    // ] => {
-                    //     let farecouponcode = get_attr_val(&e, b"Code");
-                    //     if !farecouponnumber.is_empty() && !farecouponcode.is_empty() {
-                    //         farecomponent.insert(farecouponnumber.clone(), farecouponcode.clone());
-                    //     }
-                    // }
+                    [
+                        "AMA_REV.Feed",
+                        "Transaction",
+                        "Document",
+                        "PricingDetails",
+                        "FareComponent",
+                        "SSPFareInformation",
+                        "PassengerTypeCode",
+                    ] => {
+                        let farecouponcode = get_attr_val(&e, b"Code");
+                        if !farecouponnumber.is_empty() && !farecouponcode.is_empty() {
+                            farecomponent.insert(farecouponnumber.clone(), farecouponcode.clone());
+                        }
+                    }
 
                     _ => {}
                 }
@@ -789,9 +794,9 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     wait_for_cpn_lvl_yr = false;
                 }
 
-                // if e.local_name().as_ref() == b"FareComponent" {
-                //     farecouponnumber.clear();
-                // }
+                if e.local_name().as_ref() == b"FareComponent" {
+                    farecouponnumber.clear();
+                }
 
                 if e.local_name().as_ref() == b"Coupon" {
                     // push record for completed transaction and reset
@@ -821,7 +826,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                 if e.local_name().as_ref() == b"Transaction" {
                     // push record for completed transaction and reset
                     // rows.push(rec.clone());
-                    // farecomponent.clear();
+                    farecomponent.clear();
                     rec = Record::default();
                 }
 
