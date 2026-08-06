@@ -46,6 +46,7 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
     let mut in_supp_comm_amounts = false;
     let mut in_prorated_source = false;
     let mut in_suppcommissiontype = false;
+    let mut check_first_three_chars = false;
 
     loop {
         match reader.read_event_into(&mut buf)? {
@@ -109,7 +110,13 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon"] => {
-                        rec.primary_ticket_no = get_attr_val(&e, b"DocumentNbr");
+                        let first_three_chars_primary_ticketno = get_attr_val(&e, b"DocumentNbr");
+                        if first_three_chars_primary_ticketno.starts_with("232") {
+                            check_first_three_chars = true;
+                        } else {
+                            check_first_three_chars = false;
+                        }
+                        rec.primary_ticket_no = first_three_chars_primary_ticketno;
                         rec.ticket_no = get_attr_val(&e, b"ConjunctiveDocumentNbr");
                         rec.coupon_no = get_attr_val(&e, b"Number");
                         // let coupon_no = get_attr_val(&e, b"Number");
@@ -800,19 +807,25 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
 
                 if e.local_name().as_ref() == b"Coupon" {
                     // push record for completed transaction and reset
-                    let temp_revenue = (temp_cpn_amount + temp_tax_amount + temp_tax_amount_yr) - temp_cpn_amount_spam ;
+                    if check_first_three_chars {
+                        let temp_revenue = (temp_cpn_amount + temp_tax_amount + temp_tax_amount_yr) - temp_cpn_amount_spam ;
+                        rec.revenue = temp_revenue.to_string();
+                    } else {
+                        let temp_revenue = temp_cpn_amount;
+                        rec.revenue = temp_revenue.to_string();
+                    }
                     // let temp_revenue = temp_cpn_amount + temp_tax_amount + temp_tax_amount_yr - temp_cpn_amount_spam ;
                     // rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
                     rec.prorated_fare_myr = temp_cpn_amount.to_string();
                     rec.coupon_yq_myr = temp_tax_amount.to_string();
                     rec.coupon_yr_myr = temp_tax_amount_yr.to_string();
                     rec.coupon_spam_myr = temp_cpn_amount_spam.to_string();
-                    rec.revenue = temp_revenue.to_string();
                     // total_cpn_amount = 0.0;
                     temp_cpn_amount = 0.0;
                     temp_tax_amount = 0.0;
                     temp_tax_amount_yr = 0.0;
                     temp_cpn_amount_spam = 0.0;
+                    check_first_three_chars = false;
 
                     rec.sum_cpn_txo_tax_amount_accounting_currency = total_cpn_amount.to_string();
                     // println!("Pushed record: {:?}", rec);
