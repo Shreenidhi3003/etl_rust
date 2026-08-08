@@ -3,23 +3,48 @@ mod config;
 mod csvchunker;
 mod models;
 mod parser;
+mod logs;
 
 use anyhow::Result;
 use aws_sdk_s3::Client;
+use aws_sdk_lambda::Client as LambdaClient;
 use quick_xml::Reader;
 use std::io::Cursor;
 use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+
+    let lambda_client: LambdaClient = crate::aws::make_lambda_client().await;
+    let execution_id = std::env::var("AWS_BATCH_JOB_ID").unwrap_or_else(|_| "UNKNOWN".to_string());
+    match run_job(&lambda_client, execution_id.clone()).await {
+        Ok(loaded) => {
+            let _success = crate::logs::call_logger_lambda(&lambda_client,execution_id,"success".to_string(),"XML Processing Completed".to_string(),false).await;
+            println!("XML Processing Completed Successfully{:?}",loaded);
+        }
+        Err(e) => {
+            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"XML Processing Failed".to_string(),true).await;
+            println!("XML Processing Failed: {:?}", e);
+        }
+    }
+    Ok(())
+}
+
+async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()> {
     let start_time = Instant::now();
     let input_bucket: &str = config::INPUT_BUCKET;
     let output_bucket: &str = config::OUTPUT_BUCKET;
     let csv_prefix: &str = config::CSV_PREFIX;
     let max_rows_per_chunk = config::MAX_ROWS_PER_FILE;
 
+    
     // init client
     let client: Client = crate::aws::make_s3_client().await;
+    // let lambda_client: LambdaClient = crate::aws::make_lambda_client().await;
+
+    // let execution_id = String::from("");
+
+    let _initiated = crate::logs::call_logger_lambda(&lambda_client,execution_id,"initiated".to_string(),"XML Processing Started".to_string(),false).await;
 
     for timestamp in config::TIME_STAMPS {
         println!("Processing timestamp {}", timestamp);
@@ -68,3 +93,4 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+ 
