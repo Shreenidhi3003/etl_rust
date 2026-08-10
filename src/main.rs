@@ -4,12 +4,15 @@ mod csvchunker;
 mod models;
 mod parser;
 mod logs;
+mod db;
+mod helper;
 
 use anyhow::Result;
 use aws_sdk_s3::Client;
 use aws_sdk_lambda::Client as LambdaClient;
 use quick_xml::Reader;
 use std::io::Cursor;
+use std::println;
 use std::time::Instant;
 
 #[tokio::main]
@@ -23,7 +26,7 @@ async fn main() -> Result<()> {
             println!("XML Processing Completed Successfully{:?}",loaded);
         }
         Err(e) => {
-            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"XML Processing Failed".to_string(),true).await;
+            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"XML Processing Failed".to_string(),false).await;
             println!("XML Processing Failed: {:?}", e);
         }
     }
@@ -45,6 +48,9 @@ async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()>
     // let execution_id = String::from("");
 
     let _initiated = crate::logs::call_logger_lambda(&lambda_client,execution_id,"initiated".to_string(),"XML Processing Started".to_string(),false).await;
+
+    let timestamps_list = crate::helper::load_dates_list().await?;
+    println!("timestamps_list: {:?}", timestamps_list);
 
     for timestamp in config::TIME_STAMPS {
         println!("Processing timestamp {}", timestamp);

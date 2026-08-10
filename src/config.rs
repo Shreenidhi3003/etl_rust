@@ -12,7 +12,7 @@ pub const TIME_STAMPS: &[&str] = &[
 
 // "20281116", "20281117", "20281118", "20281119", "20281120", "20281121",
 
-pub const FOLDER_NAME: &str = "RawData/anxilla-1a-rawdata/TicketingXMLDataProcessed";
+pub const FOLDER_NAME: &str = "RawData/anxilla-1a-rawdata/dummyrawdataprocessed";
 pub const INPUT_BUCKET: &str = "mh-saas-arms-prod"; // mh-saas-arms-uat
 pub const OUTPUT_BUCKET: &str = "mh-saas-arms-prod"; // mh-saas-arms-uat
 pub const CSV_PREFIX: &str = "output_csv_file";
@@ -25,7 +25,7 @@ pub const EXTENSION: &str = ".csv";
 // RawXMLTicketDataFromClient
 pub fn inputprefix(timestamp: &str) -> String {
     format!(
-        "RawData/anxilla-1a-rawdata/TicketingXMLData/{}/",
+        "RawData/anxilla-1a-rawdata/dummyrawdata/{}/",
         timestamp
     )
 }
