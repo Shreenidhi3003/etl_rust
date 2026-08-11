@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{NaiveDate, Duration, Local};
+use chrono::{NaiveDate, Duration, Local, DateTime, Utc};
 use sqlx::Row;
 
 pub async fn load_dates_list() -> Result<Vec<String>> {
@@ -8,7 +8,7 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
 
     let data = sqlx::query(
         r#"
-        SELECT max(fileloadeddate)
+        SELECT max(fileloadeddate) as max_load_date
         FROM mh_arms_aws_prod.sys_dailyjobeventlog
         WHERE pipelinename = 'MH_TICKETING_PIPELINE'
           AND jobname = 'TicketingXMLToCSV'
@@ -19,9 +19,9 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
 
     println!("Data: {:?}", data);
 
-    let max_load_date:Option<String> = data.get(0);
+    let max_load_date:Option<DateTime<Utc>> = data.try_get("max_load_date")?;
     let max_load_date = match max_load_date {
-        Some(date) => date,
+        Some(date) => date.date_naive(),
         None => {
             println!("No previous load date found.");
             return Ok(Vec::new());
@@ -31,11 +31,7 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
     let today = Local::now().date_naive();
 
     // Convert database date to NaiveDate
-    let mut current =
-        NaiveDate::parse_from_str(&max_load_date, "%Y%m%d")
-            .unwrap()
-            + Duration::days(1);
-
+    let mut current = max_load_date + Duration::days(1);
     let mut date_list: Vec<String> = Vec::new();
 
     while current <= today {

@@ -40,6 +40,10 @@ async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()>
     let csv_prefix: &str = config::CSV_PREFIX;
     let max_rows_per_chunk = config::MAX_ROWS_PER_FILE;
 
+    let timestamps_list = crate::helper::load_dates_list().await?;
+    println!("timestamps_list: {:?}", timestamps_list);
+    
+    let _initiated = crate::logs::call_logger_lambda(&lambda_client,execution_id,"initiated".to_string(),"XML Processing Started".to_string(),false).await;
     
     // init client
     let client: Client = crate::aws::make_s3_client().await;
@@ -47,10 +51,6 @@ async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()>
 
     // let execution_id = String::from("");
 
-    let _initiated = crate::logs::call_logger_lambda(&lambda_client,execution_id,"initiated".to_string(),"XML Processing Started".to_string(),false).await;
-
-    let timestamps_list = crate::helper::load_dates_list().await?;
-    println!("timestamps_list: {:?}", timestamps_list);
 
     // config::TIME_STAMPS
     for timestamp in timestamps_list {

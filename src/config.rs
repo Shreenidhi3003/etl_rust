@@ -4,11 +4,11 @@
 // pub const INPUT_PREFIX: &str = "xmlreader/dummypnr/";
 // pub const FOLDER_NAME: &str = "gluejob";
 
-pub const TIME_STAMP: &str = "20260807";
+// pub const TIME_STAMP: &str = "20260807";
 
-pub const TIME_STAMPS: &[&str] = &[
-    TIME_STAMP,
-];
+// pub const TIME_STAMPS: &[&str] = &[
+//     TIME_STAMP,
+// ];
 
 // "20281116", "20281117", "20281118", "20281119", "20281120", "20281121",
 

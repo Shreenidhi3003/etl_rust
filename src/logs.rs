@@ -2,10 +2,12 @@ use anyhow::Result;
 use aws_sdk_lambda::Client as LambdaClient;
 use serde::Serialize;
 use serde_json::json;
+use chrono::{Local, NaiveDate};
+
 
 const PIPELINE_NAME: &str = "MH_TICKETING_PIPELINE";
 const JOB_NAME: &str = "TicketingXMLToCSV";
-const JOB_TYPE: &str = "Batch";
+const JOB_TYPE: &str = "BatchTest";
 const LOGGER_LAMBDA_NAME: &str = "MH_SAAS_PROD_DailyJobsLogTriggering";
 
 #[derive(Serialize)]
@@ -16,7 +18,7 @@ struct PostgresLog {
     job_type:String,
     status:String,
     remarks:String,
-    fileloadeddate:Option<String>
+    fileloadeddate:Option<NaiveDate>
 
 }
 
@@ -34,7 +36,7 @@ struct PostgresLog {
         job_type:JOB_TYPE.to_string(),
         status,
         remarks,
-        fileloadeddate:None
+        fileloadeddate:Some(Local::now().date_naive())
     };
 
     let mut payload = json!({
