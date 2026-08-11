@@ -2,7 +2,7 @@ use anyhow::Result;
 use chrono::{NaiveDate, Duration, Local};
 use sqlx::Row;
 
-pub async fn load_dates_list() -> Result<()> {
+pub async fn load_dates_list() -> Result<Vec<String>> {
 
     let pool = crate::db::create_db_connection().await?;
 
@@ -24,7 +24,7 @@ pub async fn load_dates_list() -> Result<()> {
         Some(date) => date,
         None => {
             println!("No previous load date found.");
-            return Ok(());
+            return Ok(Vec::new());
         }
     };
     // Today's date
@@ -45,5 +45,5 @@ pub async fn load_dates_list() -> Result<()> {
 
     println!("{:?}", date_list);
 
-    Ok(())
+    Ok(date_list)
 }

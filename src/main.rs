@@ -52,9 +52,10 @@ async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()>
     let timestamps_list = crate::helper::load_dates_list().await?;
     println!("timestamps_list: {:?}", timestamps_list);
 
-    for timestamp in config::TIME_STAMPS {
+    // config::TIME_STAMPS
+    for timestamp in timestamps_list {
         println!("Processing timestamp {}", timestamp);
-        let input_prefix: String = config::inputprefix(timestamp);
+        let input_prefix: String = config::inputprefix(&timestamp);
 
         // list keys (propagate errors)
         let list_of_keys =
@@ -66,7 +67,7 @@ async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()>
             output_bucket,
             max_rows_per_chunk,
             client.clone(),
-            timestamp,
+            &timestamp,
         )
         .await?;
 
