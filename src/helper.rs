@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::{NaiveDate, Duration, Local, DateTime, Utc};
+use chrono::{Duration, Local, DateTime, Utc};
 use sqlx::Row;
 
 pub async fn load_dates_list() -> Result<Vec<String>> {
@@ -18,17 +18,19 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
     .await?;
 
     println!("Data: {:?}", data);
-
+    
+    let today = Local::now().date_naive();
     let max_load_date:Option<DateTime<Utc>> = data.try_get("max_load_date")?;
     let max_load_date = match max_load_date {
         Some(date) => date.date_naive(),
         None => {
             println!("No previous load date found.");
-            return Ok(Vec::new());
+            return Ok(vec![
+                today.format("%Y%m%d").to_string()
+            ]);
         }
     };
     // Today's date
-    let today = Local::now().date_naive();
 
     // Convert database date to NaiveDate
     let mut current = max_load_date + Duration::days(1);
