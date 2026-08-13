@@ -2,6 +2,7 @@ use anyhow::Result;
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::{Client, primitives::ByteStream};
 use aws_sdk_lambda::Client as LambdaClient;
+use aws_sdk_glue::Client as GlueClient;
 
 pub async fn make_s3_client() -> Client {
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
@@ -11,6 +12,11 @@ pub async fn make_s3_client() -> Client {
 pub async fn make_lambda_client() -> LambdaClient {
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     LambdaClient::new(&config)
+}
+
+pub async fn make_glue_client() -> GlueClient {
+    let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+    GlueClient::new(&config)
 }
 
 pub async fn list_of_xml_from_s3(

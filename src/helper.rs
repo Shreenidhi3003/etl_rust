@@ -12,6 +12,7 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
         FROM mh_arms_aws_prod.sys_dailyjobeventlog
         WHERE pipelinename = 'MH_TICKETING_PIPELINE'
           AND jobname = 'TicketingXMLToCSV'
+          AND jobtype = 'Batch'
         "#
     )
     .fetch_one(&pool)

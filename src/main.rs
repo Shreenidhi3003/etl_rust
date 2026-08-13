@@ -10,6 +10,7 @@ mod helper;
 use anyhow::Result;
 use aws_sdk_s3::Client;
 use aws_sdk_lambda::Client as LambdaClient;
+use aws_sdk_glue::Client as GlueClient;
 use quick_xml::Reader;
 use std::io::Cursor;
 use std::println;
@@ -22,12 +23,59 @@ async fn main() -> Result<()> {
     let execution_id = std::env::var("AWS_BATCH_JOB_ID").unwrap_or_else(|_| "UNKNOWN".to_string());
     match run_job(&lambda_client, execution_id.clone()).await {
         Ok(loaded) => {
-            let _success = crate::logs::call_logger_lambda(&lambda_client,execution_id,"success".to_string(),"XML Processing Completed".to_string(),false).await;
-            println!("XML Processing Completed Successfully{:?}",loaded);
+            println!("Ticketing XML Processing Completed Successfully{:?}",loaded);
+
+            let glueclient: GlueClient = crate::aws::make_glue_client().await; // GlueClient::new(&config_glue);
+            match glueclient
+                .start_job_run()
+                .job_name("MHSAASRawTicketingCreation")
+                .send()
+                .await
+                {
+                    Ok(response_glue) => {
+                        let run_id = response_glue
+                            .job_run_id()
+                            .unwrap_or_default()
+                            .to_string();
+
+                        println!(
+                            "MHSAASRawTicketingCreation triggered: {}",
+                            run_id
+                        );
+
+                        let _success = crate::logs::call_logger_lambda(
+                            &lambda_client,
+                            execution_id,
+                            "success".to_string(),
+                            "Ticketing XML Processing Completed and MHSAASRawTicketingCreation Triggered".to_string(),
+                            false,
+                        )
+                        .await;
+                    }
+
+                    Err(e) => {
+                        println!(
+                            "Ticketing XML Processing Completed, but MHSAASRawTicketingCreation trigger failed: {:?}",
+                            e
+                        );
+
+                        let _failure = crate::logs::call_logger_lambda(
+                            &lambda_client,
+                            execution_id,
+                            "failed".to_string(),
+                            format!(
+                                "Ticketing XML Processing Completed but MHSAASRawTicketingCreation Trigger Failed: {}",
+                                e
+                            ),
+                            true,
+                        )
+                        .await;
+                    }
+                }
         }
         Err(e) => {
             let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"XML Processing Failed".to_string(),false).await;
-            println!("XML Processing Failed: {:?}", e);
+            println!("Ticketing XML Processing Failed: {:?}", e);
         }
     }
     Ok(())
