@@ -44,7 +44,7 @@ impl CsvChunkerWriter {
             writer,
             timestamp: timestamp.to_string(),
         })
-    } // timestamp.to_string()
+    } 
 
     fn current_path(&self) -> PathBuf {
         PathBuf::from(&self.prefix).join(format!(

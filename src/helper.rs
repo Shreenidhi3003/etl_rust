@@ -1,6 +1,7 @@
 use anyhow::Result;
-use chrono::{Duration, Local, DateTime, Utc};
+use chrono::{Duration, DateTime, Utc};
 use sqlx::Row;
+use chrono_tz::Asia::Kuala_Lumpur;
 
 pub async fn load_dates_list() -> Result<Vec<String>> {
 
@@ -20,7 +21,8 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
 
     println!("Data: {:?}", data);
     
-    let today = Local::now().date_naive();
+    let malaysia_now = Utc::now().with_timezone(&Kuala_Lumpur);
+    let today = malaysia_now.date_naive(); 
     let max_load_date:Option<DateTime<Utc>> = data.try_get("max_load_date")?;
     let max_load_date = match max_load_date {
         Some(date) => date.date_naive(),
@@ -31,7 +33,6 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
             ]);
         }
     };
-    // Today's date
 
     // Convert database date to NaiveDate
     let mut current = max_load_date + Duration::days(1);

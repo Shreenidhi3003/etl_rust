@@ -6,6 +6,7 @@ mod parser;
 mod logs;
 mod db;
 mod helper;
+mod secretmanager;
 
 use anyhow::Result;
 use aws_sdk_s3::Client;
@@ -13,19 +14,19 @@ use aws_sdk_lambda::Client as LambdaClient;
 use aws_sdk_glue::Client as GlueClient;
 use quick_xml::Reader;
 use std::io::Cursor;
-use std::println;
+// use std::println;
 use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
 
     let lambda_client: LambdaClient = crate::aws::make_lambda_client().await;
-    let execution_id = std::env::var("AWS_BATCH_JOB_ID").unwrap_or_else(|_| "UNKNOWN".to_string());
+    let execution_id = std::env::var("AWS_BATCH_JOB_ID").unwrap_or_else(|_| "Local".to_string());
     match run_job(&lambda_client, execution_id.clone()).await {
         Ok(loaded) => {
             println!("Ticketing XML Processing Completed Successfully{:?}",loaded);
 
-            let glueclient: GlueClient = crate::aws::make_glue_client().await; // GlueClient::new(&config_glue);
+            let glueclient: GlueClient = crate::aws::make_glue_client().await;
             match glueclient
                 .start_job_run()
                 .job_name("MHSAASRawTicketingCreation")
@@ -74,7 +75,7 @@ async fn main() -> Result<()> {
                 }
         }
         Err(e) => {
-            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"XML Processing Failed".to_string(),false).await;
+            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"Ticketing XML Processing Failed".to_string(),true).await;
             println!("Ticketing XML Processing Failed: {:?}", e);
         }
     }
@@ -87,29 +88,20 @@ async fn run_job(lambda_client:&LambdaClient,execution_id: String) -> Result<()>
     let output_bucket: &str = config::OUTPUT_BUCKET;
     let csv_prefix: &str = config::CSV_PREFIX;
     let max_rows_per_chunk = config::MAX_ROWS_PER_FILE;
-
     let timestamps_list = crate::helper::load_dates_list().await?;
     println!("timestamps_list: {:?}", timestamps_list);
     
     let _initiated = crate::logs::call_logger_lambda(&lambda_client,execution_id,"initiated".to_string(),"XML Processing Started".to_string(),false).await;
     
-    // init client
     let client: Client = crate::aws::make_s3_client().await;
-    // let lambda_client: LambdaClient = crate::aws::make_lambda_client().await;
 
-    // let execution_id = String::from("");
-
-
-    // config::TIME_STAMPS
     for timestamp in timestamps_list {
         println!("Processing timestamp {}", timestamp);
         let input_prefix: String = config::inputprefix(&timestamp);
 
-        // list keys (propagate errors)
         let list_of_keys =
             crate::aws::list_of_xml_from_s3(&client, input_bucket, &input_prefix).await?;
 
-        // create csv chunker (clone client because CsvChunker takes an owned Client)
         let mut csv_writer = crate::csvchunker::CsvChunkerWriter::new(
             csv_prefix,
             output_bucket,

@@ -13,8 +13,10 @@ pub async fn create_db_connection() -> Result<PgPool> {
     let port = env::var("PG_PORT")?
         .parse::<u16>()?;
     let database = env::var("PG_DATABASE")?;
-    let username = env::var("PG_USERNAME")?;
-    let password = env::var("PG_PASSWORD")?;
+    let credentials = crate::secretmanager::get_db_credentials().await?;
+
+    let username = &credentials.username;
+    let password = &credentials.password;
 
     let options = PgConnectOptions::new()
                   .host(&host)

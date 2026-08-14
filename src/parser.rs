@@ -106,7 +106,6 @@ pub fn parse_xml<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<Record>> {
                         "ID",
                     ] => {
                         rec.pnr_no = read_text(reader)?;
-                        // println!("PNR No: {}", rec.pnr_no);
                     }
 
                     ["AMA_REV.Feed", "Transaction", "Document", "Coupon"] => {

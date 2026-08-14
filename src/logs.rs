@@ -2,13 +2,8 @@ use anyhow::Result;
 use aws_sdk_lambda::Client as LambdaClient;
 use serde::Serialize;
 use serde_json::json;
-use chrono::{Local, DateTime};
-
-
-const PIPELINE_NAME: &str = "MH_TICKETING_PIPELINE";
-const JOB_NAME: &str = "TicketingXMLToCSV";
-const JOB_TYPE: &str = "BatchTest";
-const LOGGER_LAMBDA_NAME: &str = "MH_SAAS_PROD_DailyJobsLogTriggering";
+use chrono::{NaiveDate, Utc};
+use chrono_tz::Asia::Kuala_Lumpur;
 
 #[derive(Serialize)]
 struct PostgresLog {
@@ -18,7 +13,7 @@ struct PostgresLog {
     job_type:String,
     status:String,
     remarks:String,
-    fileloadeddate:Option<DateTime<Local>>
+    fileloadeddate:Option<NaiveDate>
 
 }
 
@@ -29,14 +24,15 @@ struct PostgresLog {
     remarks:String,
     send_email:bool
 ) -> Result<(),Box<dyn std::error::Error>> {
+    let malaysia_now = Utc::now().with_timezone(&Kuala_Lumpur);
     let postgres_log = PostgresLog {
         execution_id,
-        pipeline_name:PIPELINE_NAME.to_string(),
-        job_name:JOB_NAME.to_string(),
-        job_type:JOB_TYPE.to_string(),
+        pipeline_name:crate::config::PIPELINE_NAME.to_string(),
+        job_name:crate::config::JOB_NAME.to_string(),
+        job_type:crate::config::JOB_TYPE.to_string(),
         status,
         remarks,
-        fileloadeddate:Some(Local::now())
+        fileloadeddate:Some(malaysia_now.date_naive())
     };
 
     let mut payload = json!({
@@ -48,7 +44,7 @@ struct PostgresLog {
     }
 
     let response = lambda_client.invoke()
-        .function_name(LOGGER_LAMBDA_NAME)
+        .function_name(crate::config::LOGGER_LAMBDA_NAME)
         .payload(payload.to_string().into_bytes().into())
         .send()
         .await?;
