@@ -5,3 +5,4 @@ target/
 Dockerfile
 README_DOCKER_BATCH.md
 *.log
+.env
