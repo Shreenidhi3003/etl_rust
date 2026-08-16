@@ -3,6 +3,8 @@ use chrono::{Duration, DateTime, Utc};
 use sqlx::Row;
 use chrono_tz::Asia::Kuala_Lumpur;
 
+use crate::config; 
+
 pub async fn load_dates_list() -> Result<Vec<String>> {
 
     let pool = crate::db::create_db_connection().await?;
@@ -11,13 +13,19 @@ pub async fn load_dates_list() -> Result<Vec<String>> {
         r#"
         SELECT max(fileloadeddate) as max_load_date
         FROM mh_arms_aws_prod.sys_dailyjobeventlog
-        WHERE pipelinename = 'MH_TICKETING_PIPELINE'
-          AND jobname = 'TicketingXMLToCSV'
-          AND jobtype = 'Batch'
+        WHERE pipelinename = $1
+          AND jobname = $2
+          AND jobtype = $3
+          AND status = $4
         "#
     )
+    .bind(config::PIPELINE_NAME)
+    .bind(config::JOB_NAME)
+    .bind(config::JOB_TYPE)
+    .bind(config::SUCCESS_STATUS)
     .fetch_one(&pool)
     .await?;
+
 
     println!("Data: {:?}", data);
     

@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
                         let _success = crate::logs::call_logger_lambda(
                             &lambda_client,
                             execution_id,
-                            "success".to_string(),
+                            crate::config::SUCCESS_STATUS.to_string(),
                             "Ticketing XML Processing Completed and MHSAASRawTicketingCreation Triggered".to_string(),
                             false,
                         )
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
                         let _failure = crate::logs::call_logger_lambda(
                             &lambda_client,
                             execution_id,
-                            "failed".to_string(),
+                            crate::config::FAILED_STATUS.to_string(),
                             format!(
                                 "Ticketing XML Processing Completed but MHSAASRawTicketingCreation Trigger Failed: {}",
                                 e
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
                 }
         }
         Err(e) => {
-            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,"failed".to_string(),"Ticketing XML Processing Failed".to_string(),true).await;
+            let _failure = crate::logs::call_logger_lambda(&lambda_client,execution_id,crate::config::FAILED_STATUS.to_string(),"Ticketing XML Processing Failed".to_string(),true).await;
             println!("Ticketing XML Processing Failed: {:?}", e);
         }
     }
